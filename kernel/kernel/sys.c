@@ -45,6 +45,7 @@
 #include <linux/mm.h>
 #include <linux/mempolicy.h>
 #include <linux/sched.h>
+#include <linux/sensorfs.h>
 
 #include <linux/compat.h>
 #include <linux/syscalls.h>
@@ -2680,6 +2681,13 @@ struct compat_sysinfo {
 	u32 mem_unit;
 	char _f[20-2*sizeof(u32)-sizeof(int)];
 };
+
+SYSCALL_DEFINE1(set_sensor_information, struct sensor_information *,
+	sensor_info)
+{
+	//TODO: Implement
+	return 0;
+}
 
 COMPAT_SYSCALL_DEFINE1(sysinfo, struct compat_sysinfo __user *, info)
 {

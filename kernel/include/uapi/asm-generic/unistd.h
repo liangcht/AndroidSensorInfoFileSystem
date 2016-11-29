@@ -661,6 +661,8 @@ __SC_COMP(__NR_recvmmsg, sys_recvmmsg, compat_sys_recvmmsg)
  * starting with this value.
  */
 #define __NR_arch_specific_syscall 244
+#define __NR_set_sensor_information 244
+__SYSCALL(__NR_set_sensor_information, sys_set_sensor_information)
 
 #define __NR_wait4 260
 __SC_COMP(__NR_wait4, sys_wait4, compat_sys_wait4)
