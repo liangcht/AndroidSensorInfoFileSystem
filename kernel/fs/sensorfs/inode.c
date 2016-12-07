@@ -25,7 +25,7 @@
 #define SENSORFS_DYNAMIC_FIRST 0xF0000000U
 
 static const struct super_operations sensorfs_ops;
-static const struct inode_operations sensorfs_dir_inode_operations;
+extern const struct inode_operations sensorfs_dir_inode_operations;
 
 static DEFINE_IDA(sensorfs_inum_ida);
 static DEFINE_SPINLOCK(sensorfs_inum_lock);

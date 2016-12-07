@@ -21,5 +21,5 @@ const struct inode_operations sensorfs_file_inode_operations = {
 const struct file_operations sensorfs_dir_operations = {
 };
 
-static const struct inode_operations sensorfs_dir_inode_operations = {
+const struct inode_operations sensorfs_dir_inode_operations = {
 };
