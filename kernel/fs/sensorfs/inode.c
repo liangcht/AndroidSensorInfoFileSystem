@@ -41,7 +41,8 @@ static struct sensorfs_dir_entry sensorfs_root = {
 	.namelen = 0,
 	.name = "/sensorfs",
 	.parent = &sensorfs_root,
-	.size = 0
+	.size = 0,
+	.mode = S_IFDIR
 };
 
 int sensorfs_alloc_inum(unsigned int *inum)
@@ -152,7 +153,8 @@ void sensorfs_create_sfile(struct sensorfs_dir_entry *parent, const char *name)
 	ent = kzalloc(sizeof(struct sensorfs_dir_entry), GFP_KERNEL);
 	if (!ent) 
 		return;
-
+	
+	ent->mode = S_IFREG;
 	ent->name = name;
 	ent->namelen = strlen(name);
 	ent->size = 0;

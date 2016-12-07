@@ -10,6 +10,8 @@ extern struct file_system_type sensorfs_fs_type;
 
 struct sensorfs_dir_entry {
 	//TODO: You will need to add things here
+	umode_t mode;
+	unsigned int low_ino;
 	const char *name;
 	unsigned short namelen;
 	char contents[8192]; //Use as a circular buffer
