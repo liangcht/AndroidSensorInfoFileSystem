@@ -11,13 +11,6 @@
 extern spinlock_t sensorfs_biglock;
 //TODO: Probably need a few function implemented here
 //and to fill out the following structs appropriately.
-int sensorfs_readdir(struct file *flip, void *dirent, filldir_t filldir)
-{
-	struct inode *inode = file_inode(flip);
-
-	return sensorfs_readdir_de(SDE(inode), flip, dirent, filldir);
-}
-
 int sensorfs_readdir_de(struct sensorfs_dir_entry *de, struct file *flip, void *dirent, filldir_t filldir)
 {
 	unsigned int ino;
@@ -55,7 +48,7 @@ int sensorfs_readdir_de(struct sensorfs_dir_entry *de, struct file *flip, void *
 		//TODO: lock
 		spin_lock(&sensorfs_biglock);
 		flip->f_pos++;
-		next = de->next';
+		next = de->next;
 		//TODO: pde_put
 		de = next;
 	
@@ -69,6 +62,13 @@ out:
 
 }
 
+int sensorfs_readdir(struct file *flip, void *dirent, filldir_t filldir)
+{
+	struct inode *inode = file_inode(flip);
+
+	return sensorfs_readdir_de(SDE(inode), flip, dirent, filldir);
+}
+
 
 const struct file_operations sensorfs_file_operations = {
 };
@@ -78,9 +78,13 @@ const struct inode_operations sensorfs_file_inode_operations = {
 
 const struct file_operations sensorfs_dir_operations = {
 	.readdir = sensorfs_readdir,
+	.open = dcache_dir_open,
+	.read = generic_read_dir,
+	.release = dcache_dir_close,
+	.llseek = dcache_dir_lseek
 	//TODO: check if there really is a default open function somewhere
-	//.open = sensorfs_open
 };
 
 const struct inode_operations sensorfs_dir_inode_operations = {
+	.lookup = sensorfs_lookup
 };

@@ -29,6 +29,8 @@ const char *lumi_filename = "lumi";
 const char *prox_filename = "prox";
 const char *linaccel_filename = "linaccel";
 
+static const struct dentry_operations sensorfs_dentry_operations;
+struct file_system_type sensorfs_fs_type;	
 static const struct super_operations sensorfs_ops;
 extern const struct inode_operations sensorfs_dir_inode_operations;
 extern const struct file_operations sensorfs_file_operations;
@@ -46,6 +48,8 @@ static struct sensorfs_dir_entry sensorfs_root = {
 	.mode = S_IFDIR,
 	.low_ino = SENSORFS_ROOT_INO
 };
+
+
 
 int sensorfs_alloc_inum(unsigned int *inum)
 {
@@ -74,11 +78,6 @@ retry:
 	return 0;
 }
 
-static struct sensorfs_inode *inode_to_sensorfs_inode(struct inode *inode)
-{
-	return container_of(inode, struct sensorfs_inode, vfs_inode);
-}
-
 struct inode *sensorfs_get_inode(struct super_block *sb,
 	const struct inode *dir,
 	struct sensorfs_dir_entry *de)
@@ -102,17 +101,17 @@ struct inode *sensorfs_get_inode(struct super_block *sb,
 		inode_to_sensorfs_inode(inode)->sde = de;
 
 		if (de->mode) {
-			inode->imode = de-mode;
+			inode->i_mode = de->mode;
 			//TODO: check de->uid, de->gid
 		}
 		if (de->size)
 			inode->i_size = de->size;
 		//TODO: nlink
 		if (S_ISREG(inode->i_mode)) {
-			inode->i_iop = &sensorfs_file_inode_operations;
+			inode->i_op = &sensorfs_file_inode_operations;
 			inode->i_fop = &sensorfs_file_operations;
 		} else if (S_ISDIR(inode->i_mode)){
-			inode->i_iop = &sensorfs_dir_inode_operations;
+			inode->i_op = &sensorfs_dir_inode_operations;
 			inode->i_fop = &sensorfs_dir_operations;
 		} else {
 			WARN_ON(1);
@@ -131,7 +130,7 @@ static int sensorfs_delete_dentry(const struct dentry *dentry)
 	return 1;
 }
 
-
+/*
 static struct sensorfs_dir_entry *sensorfs_sde_lookup(
 	struct sensorfs_dir_entry *parent,
 	const char *name) __attribute__((unused));
@@ -147,6 +146,7 @@ static struct sensorfs_dir_entry *sensorfs_sde_lookup(
 	//sensorfs_dir_entry corresponding to that name
 	return NULL;
 }
+*/
 
 static void init_once(void *toinit)
 {
@@ -200,26 +200,15 @@ void sensorfs_create_sfile(struct sensorfs_dir_entry *parent, const char *name)
 	parent->first_child = ent;
 }
 
-static struct dentry *sensorfs_lookup(struct inode *dir, struct dentry *dentry,
-	unsigned int flags) __attribute__((unused));
-//TODO: Remove the above prototype def'n, only used to suppress
-//compiler warning in this skeleton state
 
-static struct dentry *sensorfs_lookup(struct inode *dir, struct dentry *dentry,
-	unsigned int flags)
-{
-	//TODO: Implement
-	return sensorfs_lookup_de(SDE(dir), dir, dentry);
-}
-
-static struct dentry *sensorfs_lookup_de(struct sensorfs_dir_entry, struct inode *dir, struct dentry *dentry)
+static struct dentry *sensorfs_lookup_de(struct sensorfs_dir_entry *de, struct inode *dir, struct dentry *dentry)
 {
 	struct inode *inode;
 	//TODO: lock
-	for (de = de->subdir; de; de = de->next) {
+	for (de = de->first_child; de; de = de->next) {
 		if (de->namelen != dentry->d_name.len)
 			continue;
-		if (!memcmp(dentry->d_name.name, de->name. de->namelen)) {
+		if (!memcmp(dentry->d_name.name, de->name, de->namelen)) {
 			//TODO: pdeget(de)
 			//TODO: unlock
 			inode = sensorfs_get_inode(dir->i_sb, dir, de);
@@ -235,6 +224,18 @@ static struct dentry *sensorfs_lookup_de(struct sensorfs_dir_entry, struct inode
 	return ERR_PTR(-ENOENT);
 }
 
+/*
+static struct dentry *sensorfs_lookup(struct inode *dir, struct dentry *dentry,
+	unsigned int flags) __attribute__((unused));
+//TODO: Remove the above prototype def'n, only used to suppress
+//compiler warning in this skeleton state
+*/
+struct dentry *sensorfs_lookup(struct inode *dir, struct dentry *dentry,
+	unsigned int flags)
+{
+	//TODO: Implement
+	return sensorfs_lookup_de(SDE(dir), dir, dentry);
+}
 
 int sensorfs_fill_super(struct super_block *sb, void *data, int silent)
 {
@@ -269,7 +270,7 @@ static void sensorfs_kill_sb(struct super_block *sb)
 
 static int __init init_sensorfs_fs(void)
 {
-	sensorfs_nit_nodecache();
+	sensorfs_init_nodecache();
 	sensorfs_create_sfile(&sensorfs_root, gps_filename);
 	sensorfs_create_sfile(&sensorfs_root, lumi_filename);
 	sensorfs_create_sfile(&sensorfs_root, prox_filename);
@@ -296,4 +297,3 @@ static const struct super_operations sensorfs_ops = {
 	.alloc_inode	= sensorfs_alloc_inode,
 	.destroy_inode	= sensorfs_destroy_inode,
 };
-

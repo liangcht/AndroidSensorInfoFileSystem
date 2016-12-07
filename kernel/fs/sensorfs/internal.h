@@ -8,11 +8,23 @@ extern const struct address_space_operations sensorfs_aops;
 extern const struct inode_operations sensorfs_file_inode_operations;
 extern const struct file_operations sensorfs_dir_operations;
 extern struct file_system_type sensorfs_fs_type;
-	inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
+struct dentry *sensorfs_lookup(struct inode *dir, struct dentry *dentry,
+	unsigned int flags);
 
-static inline struct sensorfs_dir_entry *SDE(const struct inode *inode)
+struct sensorfs_inode {
+	struct sensorfs_dir_entry *sde;
+	struct inode vfs_inode;
+};
+
+static struct sensorfs_inode *inode_to_sensorfs_inode(struct inode *inode)
 {
-	return (container_of(inode, struct sensorfs_inode, vfs_inode))->sde;
+	return container_of(inode, struct sensorfs_inode, vfs_inode);
+}
+
+static inline struct sensorfs_dir_entry *SDE(struct inode *inode)
+{
+	struct sensorfs_inode *temp = inode_to_sensorfs_inode(inode);
+	return temp->sde;
 }
 
 
@@ -27,7 +39,4 @@ struct sensorfs_dir_entry {
 	struct sensorfs_dir_entry *parent, *first_child, *next;
 };
 
-struct sensorfs_inode {
-	struct sensorfs_dir_entry *sde;
-	struct inode vfs_inode;
-};
+
