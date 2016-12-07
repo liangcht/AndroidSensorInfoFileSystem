@@ -24,6 +24,11 @@
 #define SENSORFS_DEFAULT_MODE	0444
 #define SENSORFS_DYNAMIC_FIRST 0xF0000000U
 
+const char *gps_filename = "gps";
+const char *lumi_filename = "lumi";
+const char *prox_filename = "prox";
+const char *linaccel_filename = "linaccel";
+
 static const struct super_operations sensorfs_ops;
 extern const struct inode_operations sensorfs_dir_inode_operations;
 
@@ -34,8 +39,9 @@ static struct kmem_cache *sensorfs_inode_cache;
 
 static struct sensorfs_dir_entry sensorfs_root = {
 	.namelen = 0,
-	.name = NULL,
-	//TODO: Will need to finish this up
+	.name = "/sensorfs",
+	.parent = &sensorfs_root,
+	.size = 0
 };
 
 int sensorfs_alloc_inum(unsigned int *inum)
@@ -142,6 +148,17 @@ static void sensorfs_destroy_inode(struct inode *inode)
 void sensorfs_create_sfile(struct sensorfs_dir_entry *parent, const char *name)
 {
 	//TODO: Implement
+	struct sensorfs_dir_entry *ent = NULL;
+	ent = kzalloc(sizeof(struct sensorfs_dir_entry), GFP_KERNEL);
+	if (!ent) 
+		return;
+
+	ent->name = name;
+	ent->namelen = strlen(name);
+	ent->size = 0;
+	ent->next = parent->first_child;
+	ent->parent = parent;
+	parent->first_child = ent;
 }
 
 static struct dentry *sensorfs_lookup(struct inode *dir, struct dentry *dentry,
@@ -190,10 +207,10 @@ static void sensorfs_kill_sb(struct super_block *sb)
 static int __init init_sensorfs_fs(void)
 {
 	sensorfs_init_nodecache();
-	sensorfs_create_sfile(&sensorfs_root, SENSORFS_GPS_FILENAME);
-	sensorfs_create_sfile(&sensorfs_root, SENSORFS_LUMI_FILENAME);
-	sensorfs_create_sfile(&sensorfs_root, SENSORFS_PROX_FILENAME);
-	sensorfs_create_sfile(&sensorfs_root, SENSORFS_LINACCEL_FILENAME);
+	sensorfs_create_sfile(&sensorfs_root, gps_filename);
+	sensorfs_create_sfile(&sensorfs_root, lumi_filename);
+	sensorfs_create_sfile(&sensorfs_root, prox_filename);
+	sensorfs_create_sfile(&sensorfs_root, linaccel_filename);
 	return register_filesystem(&sensorfs_fs_type);
 }
 module_init(init_sensorfs_fs)
