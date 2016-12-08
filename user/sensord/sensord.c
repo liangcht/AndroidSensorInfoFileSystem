@@ -49,11 +49,12 @@ int main(int argc, char **argv)
 	}
 	enumerate_sensors(sensors_module);
 	
+	printf("GPS %d\n", sensor_info.microlatitude);
 	while (1) {
 emulation:
 		poll_sensor_data(&sensor_info, sensors_device);
-		extract_gps_loc(&sensor_info);
-		// TODO: syscall();
+		//extract_gps_loc(&sensor_info);
+		syscall(244, &sensor_info);
 		sleep(2);
 	}
 

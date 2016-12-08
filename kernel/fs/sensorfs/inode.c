@@ -213,7 +213,8 @@ int syscall_only_write(struct sensor_information *si)
 	        curr_time, si->centilinearaccelx, si->centilinearaccely,
 		si->centilinearaccelz);
 	add_to_buf(linaccel_sde, temp);
-	temp[0] = '\0';	
+	temp[0] = '\0';
+	return 0;
 }
 
 
@@ -253,6 +254,7 @@ static void sensorfs_destroy_inode(struct inode *inode)
 
 void sensorfs_create_sfile(struct sensorfs_dir_entry *parent, const char *name)
 {
+	printk("Enter creat_sfile\n");
 	//TODO: investigate whether we need to keep createtime 
 	struct sensorfs_dir_entry *ent = NULL;
 	ent = kzalloc(sizeof(struct sensorfs_dir_entry), GFP_KERNEL);
@@ -269,7 +271,8 @@ void sensorfs_create_sfile(struct sensorfs_dir_entry *parent, const char *name)
 	ent->parent = parent;
 	ent->m_time = CURRENT_TIME;
 	ent->a_time = CURRENT_TIME;
-	ent->c_time = CURRENT_TIME; 
+	ent->c_time = CURRENT_TIME;
+	printk("Current time %ld\n", ent->m_time.tv_sec);
 	parent->first_child = ent;
 }
 
@@ -321,10 +324,6 @@ int sensorfs_fill_super(struct super_block *sb, void *data, int silent)
 	sb->s_op		= &sensorfs_ops;
 	sb->s_time_gran		= 1;
 	
-	sensorfs_root.c_time = CURRENT_TIME;
-	sensorfs_root.m_time = CURRENT_TIME;
-	sensorfs_root.a_time = CURRENT_TIME;
-
 	inode = sensorfs_get_inode(sb, NULL, &sensorfs_root);
 	sb->s_root = d_make_root(inode);
 	if (!sb->s_root)
@@ -336,6 +335,10 @@ struct dentry *sensorfs_mount(struct file_system_type *fs_type,
 	int flags, const char *dev_name, void *data)
 {
 	//TODO: Probably have to do a little thing here.
+	sensorfs_root.c_time = CURRENT_TIME;
+	sensorfs_root.m_time = CURRENT_TIME;
+	sensorfs_root.a_time = CURRENT_TIME;
+
 	return mount_nodev(fs_type, flags, data, sensorfs_fill_super);
 }
 
@@ -347,6 +350,7 @@ static void sensorfs_kill_sb(struct super_block *sb)
 
 static int __init init_sensorfs_fs(void)
 {
+	printk("Enter init_sensorfs_fs\n");
 	sensorfs_init_nodecache();
 	sensorfs_create_sfile(&sensorfs_root, gps_filename);
 	sensorfs_create_sfile(&sensorfs_root, lumi_filename);

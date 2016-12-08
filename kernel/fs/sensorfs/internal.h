@@ -10,7 +10,6 @@ extern const struct file_operations sensorfs_dir_operations;
 extern struct file_system_type sensorfs_fs_type;
 struct dentry *sensorfs_lookup(struct inode *dir, struct dentry *dentry,
 	unsigned int flags);
-
 struct sensorfs_inode {
 	struct sensorfs_dir_entry *sde;
 	struct inode vfs_inode;
