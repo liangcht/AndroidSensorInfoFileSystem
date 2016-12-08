@@ -31,12 +31,12 @@ static int poll_sensor_data(struct sensor_information *sensor_info,
 			    struct sensors_poll_device_t *sensors_device);
 static int extract_gps_loc(struct sensor_information *sensor_info);
 
-void daemon_mode(void) 
+void daemon_mode(void)
 {
 	pid_t pid;
 	pid = fork();
 
-	if (pid < 0) 
+	if (pid < 0)
 		exit(EXIT_FAILURE);
 	else if (pid > 0)
 		exit(EXIT_SUCCESS);
@@ -65,7 +65,6 @@ int main(int argc, char **argv)
 	if (argv[1] && strcmp(argv[1], "-e") == 0)
 		goto emulation;
 
-	// TODO: Daemonize
 	daemon_mode();
 
 	printf("Opening sensors...\n");
@@ -75,7 +74,7 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 	enumerate_sensors(sensors_module);
-	
+
 	printf("GPS %d\n", sensor_info.microlatitude);
 	while (1) {
 emulation:
@@ -98,22 +97,20 @@ static int poll_sensor_data(struct sensor_information *sensor_info,
 	float cur_accelz = 0;
 
 	if (effective_sensor_light < 0) {
-	/* emulation */
 		cur_intensity = poll_sensor_data_emulator();
 	} else {
-		//TODO: Collect all the relevant sensor info here.
 		sensors_event_t buffer[128];
 		ssize_t count = sensors_device->poll(sensors_device,
 			buffer, sizeof(buffer)/sizeof(buffer[0]));
 		int i;
 
 		for (i = 0; i < count; ++i) {
-			if(buffer[i].sensor == effective_sensor_light)
+			if (buffer[i].sensor == effective_sensor_light)
 				cur_intensity = buffer[i].light;
 			else if (buffer[i].sensor == effective_sensor_prox)
 				cur_prox = buffer[i].distance;
-			else if (buffer[i].sensor == effective_sensor_linaccel)
-			{
+			else if (buffer[i].sensor ==
+				 effective_sensor_linaccel) {
 				cur_accelx = buffer[i].acceleration.x;
 				cur_accelx = buffer[i].acceleration.y;
 				cur_accelx = buffer[i].acceleration.z;
@@ -144,7 +141,6 @@ static int extract_gps_loc(struct sensor_information *sensor_info)
 	fscanf(fp, "%lf", &lat);
 	fscanf(fp, "%lf", &lon);
 
-	//TODO: Do something with this lat/lon
 	sensor_info->microlatitude = (int) (lat * 1000000);
 	sensor_info->microlongitude = (int) (lon * 1000000);
 

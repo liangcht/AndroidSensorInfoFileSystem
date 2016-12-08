@@ -10,11 +10,9 @@
 #include "internal.h"
 extern spinlock_t sensorfs_biglock;
 
-ssize_t sensorfs_read_file(struct file *file, char __user *buf, size_t count, 
+ssize_t sensorfs_read_file(struct file *file, char __user *buf, size_t count,
 			   loff_t *ppos)
 {
-	//TODO: investigate why FILE_STR len prints out 3 times when cat once!!
-
 	struct sensorfs_dir_entry *de;
 	int to_write;
 	char *file_str;
@@ -25,40 +23,37 @@ ssize_t sensorfs_read_file(struct file *file, char __user *buf, size_t count,
 	to_write = (int)de->size % 8192;
 	file_str = kzalloc(8193, GFP_KERNEL);
 
-	if (file_str == NULL){
+	if (file_str == NULL) {
 		spin_unlock(&sensorfs_biglock);
 		return -ENOMEM;
 	}
-	
 	if (de->size >= 8192) {
 		i = to_write;
 		while (i < 8192) {
 			BUG_ON(de->contents[i] == 0);
 			i++;
 		}
-		memcpy(file_str, 
-		       de->contents + to_write, 
+		memcpy(file_str,
+		       de->contents + to_write,
 		       8192 - to_write);
-		memcpy(file_str + (8192 - to_write), 
+		memcpy(file_str + (8192 - to_write),
 		       de->contents,
 		       to_write);
-	}
-	else {
+	} else {
 		memcpy(file_str, de->contents, to_write);
 
 	}
 
 	spin_unlock(&sensorfs_biglock);
-	ret = simple_read_from_buffer(buf, count, ppos, 
-				       file_str, 
+	ret = simple_read_from_buffer(buf, count, ppos,
+				       file_str,
 				       strlen(file_str));
 
 	kfree(file_str);
 	return ret;
 }
-//TODO: Probably need a few function implemented here
-//and to fill out the following structs appropriately.
-int sensorfs_readdir_de(struct sensorfs_dir_entry *de, struct file *flip, 
+
+int sensorfs_readdir_de(struct sensorfs_dir_entry *de, struct file *flip,
 			void *dirent, filldir_t filldir)
 {
 	unsigned int ino;
@@ -69,13 +64,11 @@ int sensorfs_readdir_de(struct sensorfs_dir_entry *de, struct file *flip,
 	ino = inode->i_ino;
 	i = flip->f_pos;
 
-	//TODO: need to design locking machanism
 	spin_lock(&sensorfs_biglock);
 	de = de->first_child;
 	for (;;) {
-		if(!de) {
+		if (!de) {
 			ret = 1;
-			//TODO: unlock;
 			spin_unlock(&sensorfs_biglock);
 			goto out;
 		}
@@ -86,22 +79,16 @@ int sensorfs_readdir_de(struct sensorfs_dir_entry *de, struct file *flip,
 	}
 	do {
 		struct sensorfs_dir_entry *next;
-		//TODO: pde_get(de) ? ref count?
 		spin_unlock(&sensorfs_biglock);
-		if (filldir(dirent, de->name, de->namelen,flip->f_pos, 
+		if (filldir(dirent, de->name, de->namelen, flip->f_pos,
 			    de->low_ino, de->mode >> 12) < 0) {
-			//TODO: pde_put
 			goto out;
 		}
-		//TODO: lock
 		spin_lock(&sensorfs_biglock);
 		flip->f_pos++;
 		next = de->next;
-		//TODO: pde_put
 		de = next;
-	
-	} while(de);
-	//TODO: unlock
+	} while (de);
 	spin_unlock(&sensorfs_biglock);
 	ret = 1;
 out:
@@ -119,7 +106,6 @@ int sensorfs_readdir(struct file *flip, void *dirent, filldir_t filldir)
 
 
 const struct file_operations sensorfs_file_operations = {
-//	.open = simple_open,
 	.read = sensorfs_read_file
 };
 

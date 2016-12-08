@@ -28,17 +28,16 @@ static inline struct sensorfs_dir_entry *SDE(struct inode *inode)
 
 
 struct sensorfs_dir_entry {
-	//TODO: You will need to add things here
 	struct timespec m_time;
 	struct timespec a_time;
 	struct timespec c_time;
-	uid_t uid;	
+	uid_t uid;
 	gid_t gid;
 	umode_t mode;
 	unsigned int low_ino;
 	const char *name;
 	unsigned short namelen;
-	char contents[8192]; //Use as a circular buffer
+	char contents[8192];
 	loff_t size;
 	struct sensorfs_dir_entry *parent, *first_child, *next;
 };
