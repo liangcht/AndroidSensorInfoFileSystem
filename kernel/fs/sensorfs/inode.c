@@ -23,7 +23,7 @@
 
 #define SENSORFS_DEFAULT_MODE	0444
 #define SENSORFS_DYNAMIC_FIRST 0xF0000000U
-
+#define SENSORFS_ROOT_INO 1
 const char *gps_filename = "gps";
 const char *lumi_filename = "lumi";
 const char *prox_filename = "prox";
@@ -31,6 +31,7 @@ const char *linaccel_filename = "linaccel";
 
 static const struct super_operations sensorfs_ops;
 extern const struct inode_operations sensorfs_dir_inode_operations;
+extern const struct file_operations sensorfs_file_operations;
 
 static DEFINE_IDA(sensorfs_inum_ida);
 static DEFINE_SPINLOCK(sensorfs_inum_lock);
@@ -38,11 +39,12 @@ DEFINE_SPINLOCK(sensorfs_biglock); //TODO: USE ME!
 static struct kmem_cache *sensorfs_inode_cache;
 
 static struct sensorfs_dir_entry sensorfs_root = {
-	.namelen = 0,
+	.namelen = 9,
 	.name = "/sensorfs",
 	.parent = &sensorfs_root,
 	.size = 0,
-	.mode = S_IFDIR
+	.mode = S_IFDIR,
+	.low_ino = SENSORFS_ROOT_INO
 };
 
 int sensorfs_alloc_inum(unsigned int *inum)
@@ -87,7 +89,41 @@ struct inode *sensorfs_get_inode(struct super_block *sb,
 	//a given sensorfs_dir_entry (de) under a parent directory
 	//Should also handle the situation when dir is NULL meaning
 	//return the root directory entry's inode
-	return NULL;
+	if (dir == NULL) {
+		if (sb->s_root != NULL)
+			return sb->s_root->d_inode;
+	}
+	struct inode *inode = new_inode_pseudo(sb);
+	
+
+	if(inode) {
+		inode->i_ino = de->low_ino;
+		inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
+		inode_to_sensorfs_inode(inode)->sde = de;
+
+		if (de->mode) {
+			inode->imode = de-mode;
+			//TODO: check de->uid, de->gid
+		}
+		if (de->size)
+			inode->i_size = de->size;
+		//TODO: nlink
+		if (S_ISREG(inode->i_mode)) {
+			inode->i_iop = &sensorfs_file_inode_operations;
+			inode->i_fop = &sensorfs_file_operations;
+		} else if (S_ISDIR(inode->i_mode)){
+			inode->i_iop = &sensorfs_dir_inode_operations;
+			inode->i_fop = &sensorfs_dir_operations;
+		} else {
+			WARN_ON(1);
+			return NULL;
+		}
+
+	}
+	else {
+		//TODO: pde_put(de)
+	}
+	return inode;
 }
 
 static int sensorfs_delete_dentry(const struct dentry *dentry)
@@ -153,7 +189,8 @@ void sensorfs_create_sfile(struct sensorfs_dir_entry *parent, const char *name)
 	ent = kzalloc(sizeof(struct sensorfs_dir_entry), GFP_KERNEL);
 	if (!ent) 
 		return;
-	
+	if (sensorfs_alloc_inum(&ent->low_ino))
+		return;
 	ent->mode = S_IFREG;
 	ent->name = name;
 	ent->namelen = strlen(name);
@@ -172,8 +209,32 @@ static struct dentry *sensorfs_lookup(struct inode *dir, struct dentry *dentry,
 	unsigned int flags)
 {
 	//TODO: Implement
-	return NULL;
+	return sensorfs_lookup_de(SDE(dir), dir, dentry);
 }
+
+static struct dentry *sensorfs_lookup_de(struct sensorfs_dir_entry, struct inode *dir, struct dentry *dentry)
+{
+	struct inode *inode;
+	//TODO: lock
+	for (de = de->subdir; de; de = de->next) {
+		if (de->namelen != dentry->d_name.len)
+			continue;
+		if (!memcmp(dentry->d_name.name, de->name. de->namelen)) {
+			//TODO: pdeget(de)
+			//TODO: unlock
+			inode = sensorfs_get_inode(dir->i_sb, dir, de);
+			if (!inode)
+				return ERR_PTR(-ENOMEM);
+			
+			d_set_d_op(dentry, &sensorfs_dentry_operations);
+			d_add(dentry, inode);
+			return NULL;
+		}
+	}
+	//TODO: unlock
+	return ERR_PTR(-ENOENT);
+}
+
 
 int sensorfs_fill_super(struct super_block *sb, void *data, int silent)
 {
@@ -208,7 +269,7 @@ static void sensorfs_kill_sb(struct super_block *sb)
 
 static int __init init_sensorfs_fs(void)
 {
-	sensorfs_init_nodecache();
+	sensorfs_nit_nodecache();
 	sensorfs_create_sfile(&sensorfs_root, gps_filename);
 	sensorfs_create_sfile(&sensorfs_root, lumi_filename);
 	sensorfs_create_sfile(&sensorfs_root, prox_filename);
