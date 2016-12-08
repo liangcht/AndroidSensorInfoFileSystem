@@ -15,22 +15,22 @@ ssize_t sensorfs_read_file(struct file *file, char __user *buf, size_t count,
 {
 	//TODO: investigate file->pos
 	struct sensorfs_dir_entry *de = SDE(file_inode(file));
-	int last_written = (int)de->size % 8192;
+	int to_write = (int)de->size % 8192;
 	char *file_str = kzalloc(8192, GFP_KERNEL);
 	size_t ret;
 	if (file_str == NULL)
 		return -ENOMEM;
 	if (de->size >= 8192) {
 		memcpy(file_str, 
-		       de->contents + (last_written + 1), 
-		       8191 - last_written);
-		memcpy(file_str + (8191 - last_written), 
+		       de->contents + to_write, 
+		       8192 - to_write);
+		memcpy(file_str + (8192 - to_write), 
 		       de->contents,
-		       last_written + 1);
+		       to_write);
 	
 	}
 	else {
-		memcpy(file_str, de->contents, last_written + 1);
+		memcpy(file_str, de->contents, to_write);
 
 	}
 	printk("DEBUG INFO CONTENTS: %s\n", de->contents);

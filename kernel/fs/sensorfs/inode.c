@@ -12,6 +12,7 @@
 #include <linux/slab.h>
 #include <linux/backing-dev.h>
 #include <linux/sensorfs.h>
+#include <linux/sensor_types.h>
 #include <linux/sched.h>
 #include <linux/parser.h>
 #include <linux/magic.h>
@@ -48,8 +49,6 @@ static struct sensorfs_dir_entry sensorfs_root = {
 	.mode = S_IFDIR | SENSORFS_DEFAULT_MODE,
 	.low_ino = SENSORFS_ROOT_INO
 };
-
-
 
 int sensorfs_alloc_inum(unsigned int *inum)
 {
@@ -92,12 +91,15 @@ struct inode *sensorfs_get_inode(struct super_block *sb,
 		if (sb->s_root != NULL)
 			return sb->s_root->d_inode;
 	}
+
 	struct inode *inode = new_inode_pseudo(sb);
-	
+	printk("Create new inode %d\n", inode->i_ino);	
 
 	if(inode) {
 		inode->i_ino = de->low_ino;
-		inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
+		inode->i_mtime = de->m_time;
+		inode->i_atime = CURRENT_TIME;
+		inode->i_ctime = de->c_time;
 		inode_to_sensorfs_inode(inode)->sde = de;
 
 		if (de->mode) {
@@ -134,7 +136,6 @@ static int sensorfs_delete_dentry(const struct dentry *dentry)
 	return 1;
 }
 
-/*
 static struct sensorfs_dir_entry *sensorfs_sde_lookup(
 	struct sensorfs_dir_entry *parent,
 	const char *name) __attribute__((unused));
@@ -142,15 +143,79 @@ static struct sensorfs_dir_entry *sensorfs_sde_lookup(
 //compiler warning in this skeleton state
 
 static struct sensorfs_dir_entry *sensorfs_sde_lookup(
-	struct sensorfs_dir_entry *parent,
+	struct sensorfs_dir_entry *de,
 	const char *name)
 {
 	//TODO: Implement
 	//Given a parent, and a name of a file, returns the
 	//sensorfs_dir_entry corresponding to that name
+	struct inode *inode;
+	//TODO: lock
+	for (de = de->first_child; de; de = de->next) {
+		if (de->namelen != strlen(name))
+			continue;
+		if (!memcmp(name, de->name, de->namelen)) {
+			//TODO: pdeget(de)
+			//TODO: unlock
+			return de;
+		}
+	}
 	return NULL;
 }
-*/
+
+void add_to_buf(struct sensorfs_dir_entry *sde, char *input)
+{
+	char *buf = sde->contents;
+	int to_write = sde->size % 8192;
+	int n = 8192 - to_write;
+	
+	strncpy(buf + to_write, input, n);
+	
+	if (strlen(input) > n) {
+		strncpy(buf, input + n, strlen(input) - n);
+	}
+	sde->size += strlen(input);
+	sde->m_time = CURRENT_TIME;
+}
+
+
+int syscall_only_write(struct sensor_information *si)
+{
+	long curr_time = get_seconds();
+	struct sensorfs_dir_entry *gps_sde;
+	struct sensorfs_dir_entry *lumi_sde;
+	struct sensorfs_dir_entry *prox_sde;
+	struct sensorfs_dir_entry *linaccel_sde;
+
+	gps_sde = sensorfs_sde_lookup(&sensorfs_root, "gps");
+	lumi_sde = sensorfs_sde_lookup(&sensorfs_root, "lumi");
+	prox_sde = sensorfs_sde_lookup(&sensorfs_root, "prox");
+	linaccel_sde = sensorfs_sde_lookup(&sensorfs_root, "linaccel");
+	
+	char temp[500];
+	sprintf(temp, "TimeStamp:%ld,MicroLatitude:%d,MicroLongitude:%d\n",
+		curr_time, si->microlatitude, si->microlongitude);
+	add_to_buf(gps_sde, temp);
+	temp[0] = '\0';
+
+	sprintf(temp, "TimeStamp:%ld,Centilux:%d\n",
+		 curr_time, si->centilux);
+	add_to_buf(lumi_sde, temp);
+	temp[0] = '\0';
+
+	sprintf(temp, "TimeStamp:%ld,Centiproximity:%d\n",
+		curr_time, si->centiproximity);
+	add_to_buf(prox_sde, temp);
+	temp[0] = '\0';
+
+	sprintf(temp,
+		"TimeStamp:%ld,CentiAccelX:%d,CentiAccelY:%d,CentiAccelZ:%d\n",
+	        curr_time, si->centilinearaccelx, si->centilinearaccely,
+		si->centilinearaccelz);
+	add_to_buf(linaccel_sde, temp);
+	temp[0] = '\0';	
+}
+
 
 static void init_once(void *toinit)
 {
@@ -202,6 +267,9 @@ void sensorfs_create_sfile(struct sensorfs_dir_entry *parent, const char *name)
 	ent->size = 0;
 	ent->next = parent->first_child;
 	ent->parent = parent;
+	ent->m_time = CURRENT_TIME;
+	ent->a_time = CURRENT_TIME;
+	ent->c_time = CURRENT_TIME; 
 	parent->first_child = ent;
 }
 
@@ -252,12 +320,15 @@ int sensorfs_fill_super(struct super_block *sb, void *data, int silent)
 	sb->s_magic		= RAMFS_MAGIC; //TODO: FIXME
 	sb->s_op		= &sensorfs_ops;
 	sb->s_time_gran		= 1;
+	
+	sensorfs_root.c_time = CURRENT_TIME;
+	sensorfs_root.m_time = CURRENT_TIME;
+	sensorfs_root.a_time = CURRENT_TIME;
 
 	inode = sensorfs_get_inode(sb, NULL, &sensorfs_root);
 	sb->s_root = d_make_root(inode);
 	if (!sb->s_root)
 		return -ENOMEM;
-
 	return 0;
 }
 
@@ -272,6 +343,7 @@ static void sensorfs_kill_sb(struct super_block *sb)
 {
 	kill_litter_super(sb);
 }
+
 
 static int __init init_sensorfs_fs(void)
 {

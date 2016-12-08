@@ -30,6 +30,9 @@ static inline struct sensorfs_dir_entry *SDE(struct inode *inode)
 
 struct sensorfs_dir_entry {
 	//TODO: You will need to add things here
+	struct timespec m_time;
+	struct timespec a_time;
+	struct timespec c_time;
 	umode_t mode;
 	unsigned int low_ino;
 	const char *name;
