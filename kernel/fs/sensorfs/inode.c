@@ -104,8 +104,12 @@ struct inode *sensorfs_get_inode(struct super_block *sb,
 			inode->i_mode = de->mode;
 			//TODO: check de->uid, de->gid
 		}
-		if (de->size)
-			inode->i_size = de->size;
+		if (de->size) {
+			if (de->size >= 8192)
+				inode->i_size = 8192;
+			else
+				inode->i_size = de->size;
+		}
 		//TODO: nlink
 		if (S_ISREG(inode->i_mode)) {
 			inode->i_op = &sensorfs_file_inode_operations;
@@ -192,9 +196,10 @@ void sensorfs_create_sfile(struct sensorfs_dir_entry *parent, const char *name)
 	if (sensorfs_alloc_inum(&ent->low_ino))
 		return;
 	ent->mode = S_IFREG;
+	strncpy(ent->contents, "hello", 5);
 	ent->name = name;
 	ent->namelen = strlen(name);
-	ent->size = 0;
+	ent->size = 5;
 	ent->next = parent->first_child;
 	ent->parent = parent;
 	parent->first_child = ent;

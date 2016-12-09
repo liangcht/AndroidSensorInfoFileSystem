@@ -6,9 +6,42 @@
 #include <linux/fs.h>
 #include <linux/mm.h>
 #include <linux/sensorfs.h>
-
+#include <linux/slab.h>
 #include "internal.h"
 extern spinlock_t sensorfs_biglock;
+
+ssize_t sensorfs_read_file(struct file *file, char __user *buf, size_t count, 
+			   loff_t *ppos)
+{
+	//TODO: investigate file->pos
+	struct sensorfs_dir_entry *de = SDE(file_inode(file));
+	int last_written = (int)de->size % 8192;
+	char *file_str = kzalloc(8192, GFP_KERNEL);
+	size_t ret;
+	if (file_str == NULL)
+		return -ENOMEM;
+	if (de->size >= 8192) {
+		memcpy(file_str, 
+		       de->contents + (last_written + 1), 
+		       8191 - last_written);
+		memcpy(file_str + (8191 - last_written), 
+		       de->contents,
+		       last_written + 1);
+	
+	}
+	else {
+		memcpy(file_str, de->contents, last_written + 1);
+
+	}
+	printk("DEBUG INFO CONTENTS: %s\n", de->contents);
+	printk("DEBUG INFO: %s\n", file_str);
+	ret = simple_read_from_buffer(buf, count, ppos, 
+				       file_str, 
+				       strlen(file_str));
+
+	kfree(file_str);
+	return ret;
+}
 //TODO: Probably need a few function implemented here
 //and to fill out the following structs appropriately.
 int sensorfs_readdir_de(struct sensorfs_dir_entry *de, struct file *flip, void *dirent, filldir_t filldir)
@@ -71,6 +104,8 @@ int sensorfs_readdir(struct file *flip, void *dirent, filldir_t filldir)
 
 
 const struct file_operations sensorfs_file_operations = {
+//	.open = simple_open,
+	.read = sensorfs_read_file
 };
 
 const struct inode_operations sensorfs_file_inode_operations = {
