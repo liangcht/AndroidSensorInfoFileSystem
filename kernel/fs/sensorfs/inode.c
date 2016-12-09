@@ -45,7 +45,7 @@ static struct sensorfs_dir_entry sensorfs_root = {
 	.name = "/sensorfs",
 	.parent = &sensorfs_root,
 	.size = 0,
-	.mode = S_IFDIR,
+	.mode = S_IFDIR | SENSORFS_DEFAULT_MODE,
 	.low_ino = SENSORFS_ROOT_INO
 };
 
@@ -195,7 +195,7 @@ void sensorfs_create_sfile(struct sensorfs_dir_entry *parent, const char *name)
 		return;
 	if (sensorfs_alloc_inum(&ent->low_ino))
 		return;
-	ent->mode = S_IFREG;
+	ent->mode = S_IFREG | SENSORFS_DEFAULT_MODE;
 	//strncpy(ent->contents, "hello", 5);
 	ent->name = name;
 	ent->namelen = strlen(name);
