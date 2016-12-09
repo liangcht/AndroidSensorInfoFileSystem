@@ -188,7 +188,7 @@ static void sensorfs_destroy_inode(struct inode *inode)
 
 void sensorfs_create_sfile(struct sensorfs_dir_entry *parent, const char *name)
 {
-	//TODO: Implement
+	//TODO: investigate whether we need to keep createtime 
 	struct sensorfs_dir_entry *ent = NULL;
 	ent = kzalloc(sizeof(struct sensorfs_dir_entry), GFP_KERNEL);
 	if (!ent) 
@@ -196,10 +196,10 @@ void sensorfs_create_sfile(struct sensorfs_dir_entry *parent, const char *name)
 	if (sensorfs_alloc_inum(&ent->low_ino))
 		return;
 	ent->mode = S_IFREG;
-	strncpy(ent->contents, "hello", 5);
+	//strncpy(ent->contents, "hello", 5);
 	ent->name = name;
 	ent->namelen = strlen(name);
-	ent->size = 5;
+	ent->size = 0;
 	ent->next = parent->first_child;
 	ent->parent = parent;
 	parent->first_child = ent;
