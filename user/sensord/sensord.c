@@ -31,6 +31,32 @@ static int poll_sensor_data(struct sensor_information *sensor_info,
 			    struct sensors_poll_device_t *sensors_device);
 static int extract_gps_loc(struct sensor_information *sensor_info);
 
+void daemon_mode(void) 
+{
+	pid_t pid;
+	pid = fork();
+
+	if (pid < 0) 
+		exit(EXIT_FAILURE);
+	else if (pid > 0)
+		exit(EXIT_SUCCESS);
+	umask(0);
+
+	pid_t sid;
+	sid = setsid();
+	if (sid < 0)
+		exit(EXIT_FAILURE);
+
+	if ((chdir("/")) < 0)
+		exit(EXIT_FAILURE);
+
+	close(STDIN_FILENO);
+	close(STDOUT_FILENO);
+	close(STDERR_FILENO);
+	return;
+
+}
+
 int main(int argc, char **argv)
 {
 	struct sensors_module_t *sensors_module = NULL;
@@ -40,6 +66,7 @@ int main(int argc, char **argv)
 		goto emulation;
 
 	// TODO: Daemonize
+	daemon_mode();
 
 	printf("Opening sensors...\n");
 	if (open_sensors(&sensors_module,

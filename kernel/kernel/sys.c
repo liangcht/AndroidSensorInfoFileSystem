@@ -2632,7 +2632,14 @@ SYSCALL_DEFINE1(set_sensor_information, struct sensor_information __user *,
 	sensor_info)
 {
 	struct sensor_information data;
-	copy_from_user(&data, sensor_info, sizeof(struct sensor_information));
+	
+	if (current_uid())
+		return -EACCES;
+	
+	if(copy_from_user(&data, sensor_info, sizeof(struct
+						     sensor_information)))
+		return -EFAULT;
+	//TODO: CHECK ERROR
 	syscall_only_write(&data);
 	return 0;
 }
