@@ -169,10 +169,10 @@ void add_to_buf(struct sensorfs_dir_entry *sde, char *input)
 	int to_write = sde->size % 8192;
 	int n = 8192 - to_write;
 	
-	strncpy(buf + to_write, input, n);
+	memcpy(buf + to_write, input, n);
 	
 	if (strlen(input) > n) {
-		strncpy(buf, input + n, strlen(input) - n);
+		memcpy(buf, input + n, strlen(input) - n);
 	}
 	sde->size += strlen(input);
 	sde->m_time = CURRENT_TIME;
@@ -196,24 +196,24 @@ int syscall_only_write(struct sensor_information *si)
 	sprintf(temp, "TimeStamp:%ld,MicroLatitude:%d,MicroLongitude:%d\n",
 		curr_time, si->microlatitude, si->microlongitude);
 	add_to_buf(gps_sde, temp);
-	temp[0] = '\0';
+	memset(temp, 0, 500);
 
 	sprintf(temp, "TimeStamp:%ld,Centilux:%d\n",
 		 curr_time, si->centilux);
 	add_to_buf(lumi_sde, temp);
-	temp[0] = '\0';
+	memset(temp, 0, 500);
 
 	sprintf(temp, "TimeStamp:%ld,Centiproximity:%d\n",
 		curr_time, si->centiproximity);
 	add_to_buf(prox_sde, temp);
-	temp[0] = '\0';
-
+	memset(temp, 0, 500);
+	
 	sprintf(temp,
 		"TimeStamp:%ld,CentiAccelX:%d,CentiAccelY:%d,CentiAccelZ:%d\n",
 	        curr_time, si->centilinearaccelx, si->centilinearaccely,
 		si->centilinearaccelz);
 	add_to_buf(linaccel_sde, temp);
-	temp[0] = '\0';
+	memset(temp, 0, 500);
 	return 0;
 }
 

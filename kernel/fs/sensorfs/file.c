@@ -16,25 +16,28 @@ ssize_t sensorfs_read_file(struct file *file, char __user *buf, size_t count,
 	//TODO: investigate file->pos
 	struct sensorfs_dir_entry *de = SDE(file_inode(file));
 	int to_write = (int)de->size % 8192;
-	char *file_str = kzalloc(8192, GFP_KERNEL);
+	char *file_str = kzalloc(8193, GFP_KERNEL);
 	size_t ret;
 	if (file_str == NULL)
 		return -ENOMEM;
 	if (de->size >= 8192) {
 		memcpy(file_str, 
-		       de->contents + to_write, 
-		       8192 - to_write);
+		       de->contents + to_write + 1, 
+		       8192 - to_write -1);
+		printk("DE->CONTNTS: %s\n", de->contents);
+		printk("to_write: %d\n", to_write);
+		printk("FIRST COPY: %d\n", strlen(file_str));
 		memcpy(file_str + (8192 - to_write), 
 		       de->contents,
 		       to_write);
+		printk("SECOND COPY: %d\n", strlen(file_str));
+		printk("FILE_STR len %d\n", strlen(file_str));
 	
 	}
 	else {
 		memcpy(file_str, de->contents, to_write);
 
 	}
-	printk("DEBUG INFO CONTENTS: %s\n", de->contents);
-	printk("DEBUG INFO: %s\n", file_str);
 	ret = simple_read_from_buffer(buf, count, ppos, 
 				       file_str, 
 				       strlen(file_str));
@@ -44,7 +47,8 @@ ssize_t sensorfs_read_file(struct file *file, char __user *buf, size_t count,
 }
 //TODO: Probably need a few function implemented here
 //and to fill out the following structs appropriately.
-int sensorfs_readdir_de(struct sensorfs_dir_entry *de, struct file *flip, void *dirent, filldir_t filldir)
+int sensorfs_readdir_de(struct sensorfs_dir_entry *de, struct file *flip, 
+			void *dirent, filldir_t filldir)
 {
 	unsigned int ino;
 	int i;
