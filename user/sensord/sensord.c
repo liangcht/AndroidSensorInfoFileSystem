@@ -27,18 +27,46 @@ static int open_sensors(struct sensors_module_t **hw_module,
 			struct sensors_poll_device_t **poll_device);
 static void enumerate_sensors(const struct sensors_module_t *sensors);
 static int poll_sensor_data_emulator(void);
-static int poll_sensor_data(struct sensors_poll_device_t *sensors_device);
-static int extract_gps_loc(void);
+static int poll_sensor_data(struct sensor_information *sensor_info,
+			    struct sensors_poll_device_t *sensors_device);
+static int extract_gps_loc(struct sensor_information *sensor_info);
+
+void daemon_mode(void) 
+{
+	pid_t pid;
+	pid = fork();
+
+	if (pid < 0) 
+		exit(EXIT_FAILURE);
+	else if (pid > 0)
+		exit(EXIT_SUCCESS);
+	umask(0);
+
+	pid_t sid;
+	sid = setsid();
+	if (sid < 0)
+		exit(EXIT_FAILURE);
+
+	if ((chdir("/")) < 0)
+		exit(EXIT_FAILURE);
+
+	close(STDIN_FILENO);
+	close(STDOUT_FILENO);
+	close(STDERR_FILENO);
+	return;
+
+}
 
 int main(int argc, char **argv)
 {
 	struct sensors_module_t *sensors_module = NULL;
 	struct sensors_poll_device_t *sensors_device = NULL;
-
+	struct sensor_information sensor_info;
 	if (argv[1] && strcmp(argv[1], "-e") == 0)
 		goto emulation;
 
 	// TODO: Daemonize
+	daemon_mode();
 
 	printf("Opening sensors...\n");
 	if (open_sensors(&sensors_module,
@@ -47,19 +75,27 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 	enumerate_sensors(sensors_module);
-
+	
+	printf("GPS %d\n", sensor_info.microlatitude);
 	while (1) {
 emulation:
-		// TODO: Poll sensors and GPS.
+		poll_sensor_data(&sensor_info, sensors_device);
+		//extract_gps_loc(&sensor_info);
+		syscall(244, &sensor_info);
 		sleep(2);
 	}
 
 	return EXIT_SUCCESS;
 }
 
-static int poll_sensor_data(struct sensors_poll_device_t *sensors_device)
+static int poll_sensor_data(struct sensor_information *sensor_info,
+			    struct sensors_poll_device_t *sensors_device)
 {
-	float cur_intensity;
+	float cur_intensity = 0;
+	float cur_prox = 0;
+	float cur_accelx = 0;
+	float cur_accely = 0;
+	float cur_accelz = 0;
 
 	if (effective_sensor_light < 0) {
 	/* emulation */
@@ -72,15 +108,28 @@ static int poll_sensor_data(struct sensors_poll_device_t *sensors_device)
 		int i;
 
 		for (i = 0; i < count; ++i) {
-			if (buffer[i].sensor != effective_sensor_light)
-				continue;
-			cur_intensity = buffer[i].light;
+			if(buffer[i].sensor == effective_sensor_light)
+				cur_intensity = buffer[i].light;
+			else if (buffer[i].sensor == effective_sensor_prox)
+				cur_prox = buffer[i].distance;
+			else if (buffer[i].sensor == effective_sensor_linaccel)
+			{
+				cur_accelx = buffer[i].acceleration.x;
+				cur_accelx = buffer[i].acceleration.y;
+				cur_accelx = buffer[i].acceleration.z;
+			}
 		}
 	}
+
+	sensor_info->centilux = (int)(cur_intensity * 100);
+	sensor_info->centiproximity = (int) (cur_prox * 100);
+	sensor_info->centilinearaccelx = (int) (cur_accelx * 100);
+	sensor_info->centilinearaccely = (int) (cur_accely * 100);
+	sensor_info->centilinearaccelz = (int) (cur_accelz * 100);
 	return 0;
 }
 
-static int extract_gps_loc(void)
+static int extract_gps_loc(struct sensor_information *sensor_info)
 {
 	FILE *fp = NULL;
 	double lat;
@@ -96,6 +145,8 @@ static int extract_gps_loc(void)
 	fscanf(fp, "%lf", &lon);
 
 	//TODO: Do something with this lat/lon
+	sensor_info->microlatitude = (int) (lat * 1000000);
+	sensor_info->microlongitude = (int) (lon * 1000000);
 
 	if (fclose(fp)) {
 		perror("closing file failed. quitting...");
@@ -178,6 +229,10 @@ static void enumerate_sensors(const struct sensors_module_t *sensors)
 
 		if (slist[s].type == SENSOR_TYPE_LIGHT)
 			effective_sensor_light = slist[s].handle;
-		//TODO: Collect all sensors here.
+
+		if (slist[s].type == SENSOR_TYPE_PROXIMITY)
+			effective_sensor_prox = slist[s].handle;
+		if (slist[s].type == SENSOR_TYPE_LINEAR_ACCELERATION)
+			effective_sensor_linaccel = slist[s].handle;
 	}
 }
