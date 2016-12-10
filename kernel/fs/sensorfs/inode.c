@@ -87,9 +87,12 @@ struct inode *sensorfs_get_inode(struct super_block *sb,
 	//a given sensorfs_dir_entry (de) under a parent directory
 	//Should also handle the situation when dir is NULL meaning
 	//return the root directory entry's inode
+	spin_lock(&sensorfs_biglock);
 	if (dir == NULL) {
-		if (sb->s_root != NULL)
+		if (sb->s_root != NULL){
+			spin_unlock(&sensorfs_biglock);
 			return sb->s_root->d_inode;
+		}
 	}
 
 	struct inode *inode = new_inode_pseudo(sb);
@@ -121,6 +124,7 @@ struct inode *sensorfs_get_inode(struct super_block *sb,
 			inode->i_fop = &sensorfs_dir_operations;
 		} else {
 			WARN_ON(1);
+			spin_unlock(&sensorfs_biglock);
 			return NULL;
 		}
 
@@ -128,6 +132,7 @@ struct inode *sensorfs_get_inode(struct super_block *sb,
 	else {
 		//TODO: pde_put(de)
 	}
+	spin_unlock(&sensorfs_biglock);
 	return inode;
 }
 
@@ -151,20 +156,24 @@ static struct sensorfs_dir_entry *sensorfs_sde_lookup(
 	//sensorfs_dir_entry corresponding to that name
 	struct inode *inode;
 	//TODO: lock
+	spin_lock(&sensorfs_biglock);
 	for (de = de->first_child; de; de = de->next) {
 		if (de->namelen != strlen(name))
 			continue;
 		if (!memcmp(name, de->name, de->namelen)) {
 			//TODO: pdeget(de)
 			//TODO: unlock
+			spin_unlock(&sensorfs_biglock);
 			return de;
 		}
 	}
+	spin_unlock(&sensorfs_biglock);
 	return NULL;
 }
 
 void add_to_buf(struct sensorfs_dir_entry *sde, char *input)
 {
+	spin_lock(&sensorfs_biglock);
 	char *buf = sde->contents;
 	int to_write = sde->size % 8192;
 	int n = 8192 - to_write;
@@ -177,6 +186,7 @@ void add_to_buf(struct sensorfs_dir_entry *sde, char *input)
 	}
 	sde->size += strlen(input);
 	sde->m_time = CURRENT_TIME;
+	spin_unlock(&sensorfs_biglock);
 }
 
 
@@ -263,8 +273,8 @@ void sensorfs_create_sfile(struct sensorfs_dir_entry *parent, const char *name)
 		return;
 	if (sensorfs_alloc_inum(&ent->low_ino))
 		return;
+	spin_lock(&sensorfs_biglock);
 	ent->mode = S_IFREG | SENSORFS_DEFAULT_MODE;
-	//strncpy(ent->contents, "hello", 5);
 	ent->name = name;
 	ent->namelen = strlen(name);
 	ent->size = 0;
@@ -273,8 +283,8 @@ void sensorfs_create_sfile(struct sensorfs_dir_entry *parent, const char *name)
 	ent->m_time = CURRENT_TIME;
 	ent->a_time = CURRENT_TIME;
 	ent->c_time = CURRENT_TIME;
-	printk("Current time %ld\n", ent->m_time.tv_sec);
 	parent->first_child = ent;
+	spin_unlock(&sensorfs_biglock);
 }
 
 
@@ -282,12 +292,14 @@ static struct dentry *sensorfs_lookup_de(struct sensorfs_dir_entry *de, struct i
 {
 	struct inode *inode;
 	//TODO: lock
+	spin_lock(&sensorfs_biglock);
 	for (de = de->first_child; de; de = de->next) {
 		if (de->namelen != dentry->d_name.len)
 			continue;
 		if (!memcmp(dentry->d_name.name, de->name, de->namelen)) {
 			//TODO: pdeget(de)
 			//TODO: unlock
+			spin_unlock(&sensorfs_biglock);
 			inode = sensorfs_get_inode(dir->i_sb, dir, de);
 			if (!inode)
 				return ERR_PTR(-ENOMEM);
@@ -298,6 +310,7 @@ static struct dentry *sensorfs_lookup_de(struct sensorfs_dir_entry *de, struct i
 		}
 	}
 	//TODO: unlock
+	spin_unlock(&sensorfs_biglock);
 	return ERR_PTR(-ENOENT);
 }
 
