@@ -169,10 +169,11 @@ void add_to_buf(struct sensorfs_dir_entry *sde, char *input)
 	int to_write = sde->size % 8192;
 	int n = 8192 - to_write;
 	
-	memcpy(buf + to_write, input, n);
-	
 	if (strlen(input) > n) {
+		memcpy(buf + to_write, input, n);
 		memcpy(buf, input + n, strlen(input) - n);
+	} else {
+		memcpy(buf + to_write, input, strlen(input));
 	}
 	sde->size += strlen(input);
 	sde->m_time = CURRENT_TIME;

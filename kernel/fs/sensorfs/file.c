@@ -13,24 +13,28 @@ extern spinlock_t sensorfs_biglock;
 ssize_t sensorfs_read_file(struct file *file, char __user *buf, size_t count, 
 			   loff_t *ppos)
 {
-	//TODO: investigate file->pos
+	//TODO: investigate why FILE_STR len prints out 3 times when cat once!!
 	struct sensorfs_dir_entry *de = SDE(file_inode(file));
 	int to_write = (int)de->size % 8192;
 	char *file_str = kzalloc(8193, GFP_KERNEL);
 	size_t ret;
 	if (file_str == NULL)
 		return -ENOMEM;
+	int i;
+debug_info:
 	if (de->size >= 8192) {
+		i = to_write;
+		while (i < 8192) {
+			if (unlikely(de->contents[i] == 0))
+				printk("DEBUG: %d th char is 0\n", i);
+			i++;
+		}
 		memcpy(file_str, 
-		       de->contents + to_write + 1, 
-		       8192 - to_write -1);
-		printk("DE->CONTNTS: %s\n", de->contents);
-		printk("to_write: %d\n", to_write);
-		printk("FIRST COPY: %d\n", strlen(file_str));
+		       de->contents + to_write, 
+		       8192 - to_write);
 		memcpy(file_str + (8192 - to_write), 
 		       de->contents,
 		       to_write);
-		printk("SECOND COPY: %d\n", strlen(file_str));
 		printk("FILE_STR len %d\n", strlen(file_str));
 	
 	}
@@ -121,7 +125,6 @@ const struct file_operations sensorfs_dir_operations = {
 	.read = generic_read_dir,
 	.release = dcache_dir_close,
 	.llseek = dcache_dir_lseek
-	//TODO: check if there really is a default open function somewhere
 };
 
 const struct inode_operations sensorfs_dir_inode_operations = {
