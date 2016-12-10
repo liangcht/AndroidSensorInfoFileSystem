@@ -87,6 +87,7 @@ struct inode *sensorfs_get_inode(struct super_block *sb,
 	//a given sensorfs_dir_entry (de) under a parent directory
 	//Should also handle the situation when dir is NULL meaning
 	//return the root directory entry's inode
+	struct inode *inode;
 	spin_lock(&sensorfs_biglock);
 	if (dir == NULL) {
 		if (sb->s_root != NULL){
@@ -95,14 +96,15 @@ struct inode *sensorfs_get_inode(struct super_block *sb,
 		}
 	}
 
-	struct inode *inode = new_inode_pseudo(sb);
-	printk("Create new inode %d\n", inode->i_ino);	
+	inode = new_inode_pseudo(sb);
 
 	if(inode) {
 		inode->i_ino = de->low_ino;
 		inode->i_mtime = de->m_time;
 		inode->i_atime = CURRENT_TIME;
 		inode->i_ctime = de->c_time;
+		inode->i_uid = de->uid;
+		inode->i_gid = de->gid;
 		inode_to_sensorfs_inode(inode)->sde = de;
 
 		if (de->mode) {
@@ -154,8 +156,6 @@ static struct sensorfs_dir_entry *sensorfs_sde_lookup(
 	//TODO: Implement
 	//Given a parent, and a name of a file, returns the
 	//sensorfs_dir_entry corresponding to that name
-	struct inode *inode;
-	//TODO: lock
 	spin_lock(&sensorfs_biglock);
 	for (de = de->first_child; de; de = de->next) {
 		if (de->namelen != strlen(name))
@@ -173,11 +173,12 @@ static struct sensorfs_dir_entry *sensorfs_sde_lookup(
 
 void add_to_buf(struct sensorfs_dir_entry *sde, char *input)
 {
-	spin_lock(&sensorfs_biglock);
+
 	char *buf = sde->contents;
 	int to_write = sde->size % 8192;
 	int n = 8192 - to_write;
 	
+	spin_lock(&sensorfs_biglock);
 	if (strlen(input) > n) {
 		memcpy(buf + to_write, input, n);
 		memcpy(buf, input + n, strlen(input) - n);
@@ -198,12 +199,13 @@ int syscall_only_write(struct sensor_information *si)
 	struct sensorfs_dir_entry *prox_sde;
 	struct sensorfs_dir_entry *linaccel_sde;
 
+	char temp[500];
 	gps_sde = sensorfs_sde_lookup(&sensorfs_root, "gps");
 	lumi_sde = sensorfs_sde_lookup(&sensorfs_root, "lumi");
 	prox_sde = sensorfs_sde_lookup(&sensorfs_root, "prox");
 	linaccel_sde = sensorfs_sde_lookup(&sensorfs_root, "linaccel");
 	
-	char temp[500];
+
 	sprintf(temp, "TimeStamp:%ld,MicroLatitude:%d,MicroLongitude:%d\n",
 		curr_time, si->microlatitude, si->microlongitude);
 	add_to_buf(gps_sde, temp);
@@ -265,7 +267,7 @@ static void sensorfs_destroy_inode(struct inode *inode)
 
 void sensorfs_create_sfile(struct sensorfs_dir_entry *parent, const char *name)
 {
-	printk("Enter creat_sfile\n");
+	//printk("Enter creat_sfile\n");
 	//TODO: investigate whether we need to keep createtime 
 	struct sensorfs_dir_entry *ent = NULL;
 	ent = kzalloc(sizeof(struct sensorfs_dir_entry), GFP_KERNEL);
@@ -291,14 +293,11 @@ void sensorfs_create_sfile(struct sensorfs_dir_entry *parent, const char *name)
 static struct dentry *sensorfs_lookup_de(struct sensorfs_dir_entry *de, struct inode *dir, struct dentry *dentry)
 {
 	struct inode *inode;
-	//TODO: lock
 	spin_lock(&sensorfs_biglock);
 	for (de = de->first_child; de; de = de->next) {
 		if (de->namelen != dentry->d_name.len)
 			continue;
 		if (!memcmp(dentry->d_name.name, de->name, de->namelen)) {
-			//TODO: pdeget(de)
-			//TODO: unlock
 			spin_unlock(&sensorfs_biglock);
 			inode = sensorfs_get_inode(dir->i_sb, dir, de);
 			if (!inode)
@@ -309,7 +308,6 @@ static struct dentry *sensorfs_lookup_de(struct sensorfs_dir_entry *de, struct i
 			return NULL;
 		}
 	}
-	//TODO: unlock
 	spin_unlock(&sensorfs_biglock);
 	return ERR_PTR(-ENOENT);
 }
@@ -323,7 +321,6 @@ static struct dentry *sensorfs_lookup(struct inode *dir, struct dentry *dentry,
 struct dentry *sensorfs_lookup(struct inode *dir, struct dentry *dentry,
 	unsigned int flags)
 {
-	//TODO: Implement
 	return sensorfs_lookup_de(SDE(dir), dir, dentry);
 }
 
@@ -352,6 +349,8 @@ struct dentry *sensorfs_mount(struct file_system_type *fs_type,
 	sensorfs_root.c_time = CURRENT_TIME;
 	sensorfs_root.m_time = CURRENT_TIME;
 	sensorfs_root.a_time = CURRENT_TIME;
+	sensorfs_root.uid = current_fsuid();
+	sensorfs_root.gid = current_fsgid();
 
 	return mount_nodev(fs_type, flags, data, sensorfs_fill_super);
 }

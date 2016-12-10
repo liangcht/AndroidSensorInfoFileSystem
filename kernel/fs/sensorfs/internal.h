@@ -32,6 +32,8 @@ struct sensorfs_dir_entry {
 	struct timespec m_time;
 	struct timespec a_time;
 	struct timespec c_time;
+	uid_t uid;	
+	gid_t gid;
 	umode_t mode;
 	unsigned int low_ino;
 	const char *name;

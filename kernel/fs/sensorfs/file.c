@@ -14,22 +14,26 @@ ssize_t sensorfs_read_file(struct file *file, char __user *buf, size_t count,
 			   loff_t *ppos)
 {
 	//TODO: investigate why FILE_STR len prints out 3 times when cat once!!
-	spin_lock(&sensorfs_biglock);
-	struct sensorfs_dir_entry *de = SDE(file_inode(file));
-	int to_write = (int)de->size % 8192;
-	char *file_str = kzalloc(8193, GFP_KERNEL);
+
+	struct sensorfs_dir_entry *de;
+	int to_write;
+	char *file_str;
 	size_t ret;
+	int i;
+	spin_lock(&sensorfs_biglock);
+	de = SDE(file_inode(file));
+	to_write = (int)de->size % 8192;
+	file_str = kzalloc(8193, GFP_KERNEL);
+
 	if (file_str == NULL){
 		spin_unlock(&sensorfs_biglock);
 		return -ENOMEM;
 	}
-	int i;
-debug_info:
+	
 	if (de->size >= 8192) {
 		i = to_write;
 		while (i < 8192) {
-			if (unlikely(de->contents[i] == 0))
-				printk("DEBUG: %d th char is 0\n", i);
+			BUG_ON(de->contents[i] == 0);
 			i++;
 		}
 		memcpy(file_str, 
@@ -38,8 +42,6 @@ debug_info:
 		memcpy(file_str + (8192 - to_write), 
 		       de->contents,
 		       to_write);
-		printk("FILE_STR len %d\n", strlen(file_str));
-	
 	}
 	else {
 		memcpy(file_str, de->contents, to_write);
